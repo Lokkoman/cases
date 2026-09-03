@@ -1,0 +1,52 @@
+# Exemplo de workflow: roda o coletor a cada 3h e commita o JSON se mudou.
+# Copie para .github/workflows/ no seu repositório e ajuste os caminhos.
+
+name: Snapshot de analytics (GA4 Data API)
+
+on:
+  schedule:
+    - cron: '25 */3 * * *' # a cada 3 horas
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: analytics-snapshot
+  cancel-in-progress: true
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Gerar analytics.json
+        env:
+          GA4_PROPERTY_ID: ${{ vars.GA4_PROPERTY_ID }}
+          GA_SA_KEY: ${{ secrets.GA_SA_KEY }}
+        run: |
+          set -e
+          OUT=caminho-1-data-api/analytics.json
+          node caminho-1-data-api/fetch-analytics.mjs > /tmp/analytics.json
+          # só substitui se o resultado for JSON válido e com os totais esperados
+          node -e "const d=require('/tmp/analytics.json'); if(!d.totals || typeof d.totals.activeUsers!=='number'){console.error('JSON invalido');process.exit(1)}"
+          mv /tmp/analytics.json "$OUT"
+
+      - name: Commit se mudou
+        run: |
+          git config user.name "analytics-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add caminho-1-data-api/analytics.json
+          if git diff --staged --quiet; then
+            echo "Sem mudanca nos dados."
+          else
+            git commit -m "chore: snapshot de analytics $(date -u +%FT%TZ)"
+            git push
+          fi

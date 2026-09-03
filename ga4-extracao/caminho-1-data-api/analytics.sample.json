@@ -1,0 +1,29 @@
+{
+  "updatedAt": "2026-01-15",
+  "generatedAt": "2026-01-15T09:25:00.000Z",
+  "range": "Últimos 28 dias",
+  "property": "meu-site",
+  "totals": {
+    "activeUsers": 1240,
+    "sessions": 1890,
+    "screenPageViews": 5430,
+    "avgEngagementSeconds": 74,
+    "newUsersPct": 63
+  },
+  "daily": [
+    { "date": "2026-01-13", "screenPageViews": 190, "activeUsers": 44 },
+    { "date": "2026-01-14", "screenPageViews": 205, "activeUsers": 51 },
+    { "date": "2026-01-15", "screenPageViews": 88, "activeUsers": 23 }
+  ],
+  "topPages": [
+    { "path": "/", "views": 1980 },
+    { "path": "/blog", "views": 640 },
+    { "path": "/precos", "views": 410 },
+    { "path": "/sobre", "views": 220 }
+  ],
+  "topCountries": [
+    { "country": "Brazil", "users": 910 },
+    { "country": "Portugal", "users": 140 },
+    { "country": "United States", "users": 95 }
+  ]
+}
