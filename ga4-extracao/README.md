@@ -7,11 +7,11 @@ numa stack diferente: como é montado, o que entrega e quanto custa.
 O eixo que separa os cinco é **como o dado chega**:
 
 - **Via GA4 Data API** (caminhos 1, 4, 5) — você escreve um `runReport` pedindo
-  as métricas e dimensões. Muda o runtime: GitHub Actions, Azure Databricks,
-  Microsoft Fabric + Airflow.
-- **Via BigQuery** (caminhos 2, 3) — o Google entrega, você só configura no
-  console. Muda o que vem: evento cru (export nativo) ou tabela de relatório
-  pronta (Data Transfer Service).
+  as métricas e dimensões. Muda o runtime: GitHub Actions, ou **Microsoft
+  Azure** (Azure Databricks, Microsoft Fabric + Airflow).
+- **Via BigQuery** (caminhos 2, 3), no **Google Cloud** — o Google entrega, você
+  só configura no console. Muda o que vem: evento cru (export nativo) ou tabela
+  de relatório pronta (Data Transfer Service).
 
 Não competem. Um projeto real liga vários ao mesmo tempo — um número solto pra
 um dashboard leve, o evento cru pra modelar do zero, o pipeline em camadas pra
@@ -35,10 +35,13 @@ flowchart LR
 
 ### Via GA4 Data API — caminhos 1, 4, 5
 
-Mesma API (`runReport`), autenticada por service account. Muda o runtime.
+Mesma API (`runReport`), autenticada por service account. Muda o runtime. Os
+caminhos 4 e 5 rodam na **Microsoft Azure** (Azure Databricks, Microsoft
+Fabric); o 1 não tem nuvem de dados, roda no CI do GitHub.
 
 | | 1 · GitHub Actions | 4 · Azure Databricks | 5 · Fabric + Airflow |
 |---|---|---|---|
+| Nuvem | GitHub (sem warehouse) | Microsoft Azure | Microsoft Azure |
 | Runtime | GitHub Actions (CI) | cluster Spark do Databricks | cluster Spark do Fabric |
 | Linguagem | Node.js, sem dependências | PySpark | PySpark |
 | Orquestrador | cron do Actions | scheduler do Databricks | Apache Airflow (Docker) via API REST |
@@ -49,10 +52,12 @@ Mesma API (`runReport`), autenticada por service account. Muda o runtime.
 
 ### Via BigQuery — caminhos 2, 3
 
-O Google escreve no seu BigQuery. Sem código, só configuração de console.
+Tudo no **Google Cloud**: o Google escreve direto no seu BigQuery, sem código,
+só configuração de console.
 
 | | 2 · export nativo | 3 · Data Transfer Service |
 |---|---|---|
+| Nuvem | Google Cloud | Google Cloud |
 | Onde configura | Admin do GA4 -> Vinculações do BigQuery | BigQuery -> Transferências -> conector "Google Analytics 4" |
 | O que sai | evento cru, um registro por evento | tabelas de relatório já agregadas |
 | Frequência | streaming + tabela diária | a cada 24h, com janela de reprocessamento |
