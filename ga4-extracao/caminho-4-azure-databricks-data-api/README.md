@@ -1,4 +1,4 @@
-# Caminho 4 — Azure Databricks: bronze + prata
+# Caminho 4 — Azure Databricks + GA4 Data API
 
 Extração do GA4 do site raulpavao.com.br (propriedade `552236564`) direto pela
 **GA4 Data API** — sem passar pelo BigQuery — rodando em **PySpark no Azure
@@ -6,9 +6,9 @@ Databricks**, gravando **Delta Lake** governado pelo **Unity Catalog**. Duas
 camadas: bronze (9 chamadas, uma tabela por tema) e prata (uma tabela larga
 tratada, equivalente ao `dados_tratados` do BigQuery).
 
-É o [caminho 1](../README.md#caminho-1--ga4-data-api) (Data API) levado a
-pipeline de engenharia de dados de verdade: catálogo, camadas, PySpark, checagem
-de qualidade.
+É o [caminho 1](../caminho-1-github-actions-data-api/) (Data API) num pipeline de
+engenharia de dados de verdade: catálogo, camadas, PySpark, checagem de
+qualidade.
 
 ## Stack
 
@@ -101,7 +101,7 @@ Pré-requisitos:
 
 Mesma família (GA4 Data API → lakehouse Delta). Aqui: as 9 bronze **e** a prata
 cruzada, no ecossistema nativo do Databricks (Unity Catalog, secret scope).
-[Lá](../caminho-5-fabric-airflow/): as 9 bronze, ainda sem prata, mas com
+[Lá](../caminho-5-fabric-airflow-data-api/): as 9 bronze, ainda sem prata, mas com
 **Airflow externo** orquestrando o Fabric por service principal. Um mostra
 modelagem em camadas completa; o outro, o orquestrador que qualquer empresa fora
 do Databricks reconhece.

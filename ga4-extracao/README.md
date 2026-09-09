@@ -1,17 +1,21 @@
 # GA4: as 5 formas de extrair os dados
 
-O Google Analytics 4 tem um ponto de coleta (a propriedade) e mais de uma saída
-para o dado. Este case mostra cinco jeitos de tirar dado de lá, como cada um é
-montado, o que entrega e quanto custa.
+O Google Analytics 4 tem um ponto de coleta (a propriedade) e mais de uma forma
+de tirar o dado de lá. Este case mostra cinco pipelines de extração, cada um
+numa stack diferente: como é montado, o que entrega e quanto custa.
 
-Os três primeiros são **saídas diferentes** do GA4 — não competem, um projeto
-real liga os três ao mesmo tempo porque servem consumidores diferentes: um
-número solto para um dashboard leve, o evento cru para modelar do zero, a tabela
-de relatório pronta para reproduzir rápido o que o GA4 já mostra.
+O eixo que separa os cinco é **como o dado chega**:
 
-Os caminhos 4 e 5 são o **caminho 1 (Data API) levado a sério como engenharia de
-dados**, em duas stacks: Azure Databricks e Microsoft Fabric + Airflow. Aqui
-entram camada bronze/prata, Delta Lake, catálogo e orquestrador.
+- **Via GA4 Data API** (caminhos 1, 4, 5) — você escreve um `runReport` pedindo
+  as métricas e dimensões. Muda o runtime: GitHub Actions, Azure Databricks,
+  Microsoft Fabric + Airflow.
+- **Via BigQuery** (caminhos 2, 3) — o Google entrega, você só configura no
+  console. Muda o que vem: evento cru (export nativo) ou tabela de relatório
+  pronta (Data Transfer Service).
+
+Não competem. Um projeto real liga vários ao mesmo tempo — um número solto pra
+um dashboard leve, o evento cru pra modelar do zero, o pipeline em camadas pra
+BI.
 
 Glossário das ferramentas e conceitos (REST, cluster, medallion, Delta Lake,
 Unity Catalog, service principal, etc.): [`CONCEITOS.md`](CONCEITOS.md).
@@ -22,40 +26,43 @@ Unity Catalog, service principal, etc.): [`CONCEITOS.md`](CONCEITOS.md).
 flowchart LR
   site["Site (consentimento -> gtag)"] --> ga4["GA4 (propriedade)"]
 
-  ga4 -->|"1. Data API (job próprio)"| api["JSON no repositório"]
-  ga4 -->|"2. Export nativo (link no Admin)"| raw["BigQuery: events_* (evento cru)"]
-  ga4 -->|"3. Data Transfer Service"| rep["BigQuery: tabelas de relatório"]
-  ga4 -->|"4. Data API em PySpark"| dbx["Databricks: bronze + prata (Delta)"]
-  ga4 -->|"5. Data API em Notebook, Airflow orquestra"| fab["Fabric Lakehouse: bronze (Delta)"]
+  ga4 -->|"1. GitHub Actions + Data API"| api["JSON no repositório git"]
+  ga4 -->|"2. BigQuery + export nativo"| raw["BigQuery: events_* (evento cru)"]
+  ga4 -->|"3. BigQuery + Data Transfer Service"| rep["BigQuery: tabelas de relatório"]
+  ga4 -->|"4. Azure Databricks + Data API"| dbx["Databricks: bronze + prata (Delta)"]
+  ga4 -->|"5. Fabric + Airflow + Data API"| fab["Fabric Lakehouse: bronze (Delta)"]
 ```
 
-### Caminhos 1–3: as saídas do GA4
+### Via GA4 Data API — caminhos 1, 4, 5
 
-| | 1 · Data API | 2 · Export nativo | 3 · Data Transfer Service |
+Mesma API (`runReport`), autenticada por service account. Muda o runtime.
+
+| | 1 · GitHub Actions | 4 · Azure Databricks | 5 · Fabric + Airflow |
 |---|---|---|---|
-| Onde se configura | código, no repositório | Admin do GA4 -> Vinculações do BigQuery | BigQuery -> Transferências -> conector "Google Analytics 4" |
-| O que sai | os números que você pedir, em JSON | evento cru, um registro por evento | tabelas de relatório já agregadas |
-| Autenticação | service account (chave em secret) | conta Google com acesso à propriedade | conta Google (OAuth, 1 vez) |
-| Frequência | você decide (cron) | streaming + tabela diária | a cada 24h, com janela de reprocessamento |
-| Custo | nenhum, dentro da cota da API | só armazenamento no BigQuery | só armazenamento no BigQuery |
-| Precisa de BigQuery | não | sim | sim |
-| Pasta | `caminho-1-data-api/` (código) | `caminho-2-export-nativo/` (config + SQL) | `caminho-3-dts/` (config + SQL) |
+| Runtime | GitHub Actions (CI) | cluster Spark do Databricks | cluster Spark do Fabric |
+| Linguagem | Node.js, sem dependências | PySpark | PySpark |
+| Orquestrador | cron do Actions | scheduler do Databricks | Apache Airflow (Docker) via API REST |
+| Saída | JSON no repositório | Delta: bronze **+ prata** (Unity Catalog) | Delta: bronze (Lakehouse / OneLake) |
+| Segredo | GitHub secret | Databricks secret scope | Azure Key Vault + service principal |
+| Custo | grátis, dentro da cota da API | compute do Databricks | capacidade do Fabric |
+| Pasta | `caminho-1-github-actions-data-api/` | `caminho-4-azure-databricks-data-api/` | `caminho-5-fabric-airflow-data-api/` |
 
-### Caminhos 4–5: a Data API como pipeline
+### Via BigQuery — caminhos 2, 3
 
-| | 4 · Azure Databricks | 5 · Fabric + Airflow |
+O Google escreve no seu BigQuery. Sem código, só configuração de console.
+
+| | 2 · export nativo | 3 · Data Transfer Service |
 |---|---|---|
-| Extração | GA4 Data API em PySpark | GA4 Data API num Notebook Fabric |
-| Orquestrador | scheduler do Databricks (ou manual) | Apache Airflow local (Docker), dispara pela API REST do Fabric |
-| Identidade | service account (secret scope) | + service principal do Entra ID pro Airflow |
-| Camadas | bronze (9 chamadas) **+ prata** (tabela tratada) | bronze (9 chamadas) |
-| Formato / catálogo | Delta Lake, Unity Catalog | Delta Lake, Lakehouse / OneLake |
-| Segredo | Databricks secret scope | Azure Key Vault |
-| Código neste repo | `caminho-4-databricks/` | `caminho-5-fabric-airflow/` |
+| Onde configura | Admin do GA4 -> Vinculações do BigQuery | BigQuery -> Transferências -> conector "Google Analytics 4" |
+| O que sai | evento cru, um registro por evento | tabelas de relatório já agregadas |
+| Frequência | streaming + tabela diária | a cada 24h, com janela de reprocessamento |
+| Autenticação | conta Google com acesso à propriedade (1 clique) | conta Google (OAuth, 1 vez) |
+| Custo | armazenamento no BigQuery | armazenamento no BigQuery |
+| Pasta | `caminho-2-bigquery-export-nativo/` (config + SQL) | `caminho-3-bigquery-data-transfer-service/` (config + SQL) |
 
 ---
 
-## Caminho 1 — GA4 Data API
+## Caminho 1 — GitHub Actions + GA4 Data API
 
 A API oficial de leitura do GA4 (`analyticsdata.googleapis.com`). Você faz um
 `runReport` pedindo métricas e dimensões e recebe JSON. Um job agendado roda de
@@ -79,7 +86,7 @@ arquivo. Sem banco de dados no meio.
 Exatamente as métricas e dimensões do seu `runReport`. No exemplo deste repo:
 totais dos últimos 28 dias (usuários, sessões, visualizações, engajamento
 médio), série diária de visualizações e usuários, top páginas e top países.
-Formato em [`caminho-1-data-api/analytics.sample.json`](caminho-1-data-api/analytics.sample.json).
+Formato em [`caminho-1-github-actions-data-api/analytics.sample.json`](caminho-1-github-actions-data-api/analytics.sample.json).
 
 ### Detalhe: janela de reprocessamento
 
@@ -94,11 +101,11 @@ janela móvel de 28 dias, sempre refeitos por inteiro (não têm histórico por 
 Alimentar um dashboard leve, um site estático, um relatório recorrente. Quando
 você quer poucos números, atualizados sozinhos, sem manter warehouse.
 
-Código: [`caminho-1-data-api/`](caminho-1-data-api/)
+Código: [`caminho-1-github-actions-data-api/`](caminho-1-github-actions-data-api/)
 
 ---
 
-## Caminho 2 — Export nativo GA4 -> BigQuery
+## Caminho 2 — BigQuery + export nativo GA4
 
 O link nativo. O Google escreve o **evento cru** direto num dataset seu no
 BigQuery, sem você programar nada. É a base para qualquer modelagem séria
@@ -125,7 +132,7 @@ Um registro por evento, no schema padrão do GA4, em inglês:
 
 Pegar um parâmetro exige `UNNEST(event_params)`. Exemplo de leitura (só ler o
 cru, sem modelar) em
-[`caminho-2-export-nativo/exemplo.sql`](caminho-2-export-nativo/exemplo.sql).
+[`caminho-2-bigquery-export-nativo/exemplo.sql`](caminho-2-bigquery-export-nativo/exemplo.sql).
 
 ### Custo
 
@@ -139,11 +146,11 @@ Google vem "pronto" aqui: é matéria-prima. É de onde sai a tabela
 `dados_tratados` (16 dimensões, 21 métricas) que os caminhos 4 e 5 tentam
 reproduzir pela Data API.
 
-Detalhes: [`caminho-2-export-nativo/`](caminho-2-export-nativo/)
+Detalhes: [`caminho-2-bigquery-export-nativo/`](caminho-2-bigquery-export-nativo/)
 
 ---
 
-## Caminho 3 — Data Transfer Service (conector GA4)
+## Caminho 3 — BigQuery + Data Transfer Service
 
 O BigQuery tem um conector **"Google Analytics 4"** no Data Transfer Service que
 puxa as **tabelas de relatório prontas** do GA4, as mesmas da biblioteca de
@@ -172,7 +179,7 @@ relatório vem em **dupla**:
 
 Exemplos: `ga4_TrafficAcquisition_<ID>`, `ga4_PagesAndScreens_<ID>`,
 `ga4_Events_<ID>`. Consulta de exemplo em
-[`caminho-3-dts/exemplo.sql`](caminho-3-dts/exemplo.sql).
+[`caminho-3-bigquery-data-transfer-service/exemplo.sql`](caminho-3-bigquery-data-transfer-service/exemplo.sql).
 
 ### Custo
 
@@ -184,11 +191,11 @@ armazenamento das tabelas.
 Ter rápido, sem escrever SQL de modelagem, os números que o GA4 já mostra na
 tela, num lugar onde dá para juntar com outras fontes. Não te dá o evento cru.
 
-Detalhes: [`caminho-3-dts/`](caminho-3-dts/)
+Detalhes: [`caminho-3-bigquery-data-transfer-service/`](caminho-3-bigquery-data-transfer-service/)
 
 ---
 
-## Caminho 4 — Azure Databricks: bronze + prata
+## Caminho 4 — Azure Databricks + GA4 Data API
 
 O caminho 1 virado pipeline de engenharia. A mesma GA4 Data API, agora em
 **PySpark no Azure Databricks**, gravando **Delta Lake** governado pelo **Unity
@@ -200,11 +207,11 @@ pivota os eventos em coluna e cruza tudo, com checagem de que a soma bate).
 Stack: GA4 Data API · Databricks · PySpark · Delta Lake · Unity Catalog · secret
 scope · Serverless SQL Warehouse.
 
-Detalhes e código: [`caminho-4-databricks/`](caminho-4-databricks/)
+Detalhes e código: [`caminho-4-azure-databricks-data-api/`](caminho-4-azure-databricks-data-api/)
 
 ---
 
-## Caminho 5 — Fabric + Airflow
+## Caminho 5 — Fabric + Airflow + GA4 Data API
 
 O mesmo caminho, outra stack, com o foco na **orquestração**. A extração roda num
 **Notebook do Microsoft Fabric** (Spark), gravando Delta num **Lakehouse**. O
@@ -221,7 +228,7 @@ métricas da tratada do BigQuery — ficam de fora `paginas_distintas` e
 Stack: Apache Airflow · Docker · Microsoft Fabric · Lakehouse / OneLake · Delta
 Lake · GA4 Data API · Entra ID service principal · Azure Key Vault · REST.
 
-Detalhes e código: [`caminho-5-fabric-airflow/`](caminho-5-fabric-airflow/)
+Detalhes e código: [`caminho-5-fabric-airflow-data-api/`](caminho-5-fabric-airflow-data-api/)
 
 ---
 

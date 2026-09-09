@@ -1,9 +1,9 @@
-# Caminho 5 — Fabric + Airflow
+# Caminho 5 — Fabric + Airflow + GA4 Data API
 
-O [caminho 1](../README.md#caminho-1--ga4-data-api) (GA4 Data API) rodando dentro
-de um Notebook do Microsoft Fabric que grava tabelas Delta num Lakehouse. O
-Airflow roda local (Docker), não toca no dado: só dispara o Notebook pela API do
-Fabric e espera terminar.
+O [caminho 1](../caminho-1-github-actions-data-api/) (GA4 Data API) rodando
+dentro de um Notebook do Microsoft Fabric que grava tabelas Delta num Lakehouse.
+O Airflow roda local (Docker), não toca no dado: só dispara o Notebook pela API
+do Fabric e espera terminar.
 
 O ponto do case é a orquestração. A extração em si (GA4 Data API dentro de um
 notebook) já é padrão conhecido. O que raramente aparece pronto é Airflow fora
@@ -79,7 +79,7 @@ BigQuery (`dados_tratados`). Ficam de fora, por limite da Data API:
 
 A camada **prata** (agregar cada bronze pra chave de 5, cruzar e pivotar
 eventos em coluna, igual ao `dados_tratados` do BigQuery) ainda não está aqui.
-No [caminho 4](../caminho-4-databricks/) ela existe.
+No [caminho 4](../caminho-4-azure-databricks-data-api/) ela existe.
 
 A chave da service account vem do Key Vault por
 `notebookutils.credentials.getSecret`, nunca fica no código.
