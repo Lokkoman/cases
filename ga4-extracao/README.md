@@ -7,8 +7,9 @@ numa stack diferente: como é montado, o que entrega e quanto custa.
 O eixo que separa os cinco é **como o dado chega**:
 
 - **Via GA4 Data API** (caminhos 1, 4, 5) — você escreve um `runReport` pedindo
-  as métricas e dimensões. Muda o runtime: GitHub Actions, ou **Microsoft
-  Azure** (Azure Databricks, Microsoft Fabric + Airflow).
+  as métricas e dimensões. Muda o runtime: GitHub Actions, ou **Microsoft** —
+  Azure Databricks (no Azure) ou Microsoft Fabric + Airflow (Fabric é plataforma
+  SaaS própria, não é Azure).
 - **Via BigQuery** (caminhos 2, 3), no **Google Cloud** — o Google entrega, você
   só configura no console. Muda o que vem: evento cru (export nativo) ou tabela
   de relatório pronta (Data Transfer Service).
@@ -36,12 +37,14 @@ flowchart LR
 ### Via GA4 Data API — caminhos 1, 4, 5
 
 Mesma API (`runReport`), autenticada por service account. Muda o runtime. Os
-caminhos 4 e 5 rodam na **Microsoft Azure** (Azure Databricks, Microsoft
-Fabric); o 1 não tem nuvem de dados, roda no CI do GitHub.
+caminhos 4 e 5 rodam em plataformas da **Microsoft**: o 4 no **Azure** (Databricks
+é serviço first-party do Azure), o 5 no **Microsoft Fabric** (SaaS próprio,
+capacidade F SKU, billing separado — não é Azure). O 1 não tem nuvem de dados,
+roda no CI do GitHub.
 
 | | 1 · GitHub Actions | 4 · Azure Databricks | 5 · Fabric + Airflow |
 |---|---|---|---|
-| Nuvem | GitHub (sem warehouse) | Microsoft Azure | Microsoft Azure |
+| Nuvem | GitHub (sem warehouse) | Microsoft Azure | Microsoft Fabric |
 | Runtime | GitHub Actions (CI) | cluster Spark do Databricks | cluster Spark do Fabric |
 | Linguagem | Node.js, sem dependências | PySpark | PySpark |
 | Orquestrador | cron do Actions | scheduler do Databricks | Apache Airflow (Docker) via API REST |
@@ -62,7 +65,7 @@ só configuração de console.
 | O que sai | evento cru, um registro por evento | tabelas de relatório já agregadas |
 | Frequência | streaming + tabela diária | a cada 24h, com janela de reprocessamento |
 | Autenticação | conta Google com acesso à propriedade (1 clique) | conta Google (OAuth, 1 vez) |
-| Custo | armazenamento no BigQuery | armazenamento no BigQuery |
+| Custo | armazenamento no BigQuery (+ inserção, só no streaming) | armazenamento no BigQuery |
 | Pasta | `caminho-2-google-bigquery-export-nativo/` (config + SQL) | `caminho-3-google-bigquery-data-transfer-service/` (config + SQL) |
 
 ---
@@ -96,10 +99,12 @@ Formato em [`caminho-1-github-actions-data-api/analytics.sample.json`](caminho-1
 ### Detalhe: janela de reprocessamento
 
 A série diária é histórico acumulado no próprio JSON. A cada execução o script
-busca só os últimos 7 dias e sobrescreve esses dias no arquivo, preservando o
-resto. O GA4 ainda corrige o dado recente por alguns dias; refazer uma janela
-curta pega essa correção sem reprocessar tudo. Os totais e rankings são uma
-janela móvel de 28 dias, sempre refeitos por inteiro (não têm histórico por dia).
+refaz a janela de **hoje + os 7 dias anteriores** (8 datas) e sobrescreve esses
+dias no arquivo, preservando o resto. A de hoje entra parcial e é reescrita a
+cada run; o GA4 ainda corrige o dado recente por alguns dias, então refazer uma
+janela curta pega essa correção sem reprocessar tudo. Os totais e rankings são
+uma janela móvel de 28 dias, sempre refeitos por inteiro (não têm histórico por
+dia).
 
 ### Serve para
 

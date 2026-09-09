@@ -21,7 +21,7 @@ Glossário do que os cases usam. Marca de onde cada termo aparece:
 
 | Termo | O que é |
 |---|---|
-| **Camada / medallion (bronze, prata, ouro)** `[DBX] [FAB]` | Bronze = dado quase cru, um relatório por tabela. Prata = agregado, limpo e cruzado numa tabela larga pronta pra consumo. Ouro = recortes de negócio. Os cases fazem bronze (os 5) e prata (só o Databricks até agora). |
+| **Camada / medallion (bronze, prata, ouro)** `[DBX] [FAB]` | Bronze = dado quase cru, um relatório por tabela. Prata = agregado, limpo e cruzado numa tabela larga pronta pra consumo. Ouro = recortes de negócio. Bronze e prata montados à mão só aparecem nos caminhos 4 e 5 (o Databricks tem prata; o Fabric, só bronze). Os outros pousam o dado noutro formato: o 2 é evento cru (antes de qualquer camada), o 3 já vem agregado pelo Google (não é bronze), o 1 é um snapshot JSON num arquivo. |
 | **Chave de atribuição** `[DBX] [FAB]` | As 5 dimensões que toda tabela bronze carrega nas primeiras posições: `date, sessionDefaultChannelGroup, sessionSource, sessionMedium, sessionCampaignName`. É a "espinha" que deixa agregar cada bronze e juntar tudo na prata sem duplicar. |
 | **Grão (granularidade)** `[todos]` | O nível de detalhe de uma linha. A tratada do BigQuery é grão de 16 dimensões (uma linha por combinação). A prata do Databricks é grão de 5 (a chave de atribuição). Quanto mais fino o grão, mais linhas e mais detalhe. |
 | **Pivô de evento (linha → coluna)** `[DBX] [FAB]` | A Data API devolve `eventName` como dimensão (uma linha por tipo de evento). Na prata isso vira uma coluna por evento (`rolagens`, `cliques_saida`, `downloads`…), cada uma com a soma de `eventCount`. Equivale ao `COUNTIF(event_name = '...')` do SQL do BigQuery. |

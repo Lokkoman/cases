@@ -1,4 +1,4 @@
-# Caminho 1 — GA4 Data API
+# Caminho 1 — GitHub Actions + GA4 Data API
 
 Coletor sem dependências: assina um JWT da service account com `node:crypto`,
 troca por um access token e chama o `runReport` da GA4 Data API. Imprime o JSON
@@ -44,6 +44,7 @@ Requer Node 18+ (usa `fetch` nativo).
 - A chave da service account **nunca** é commitada. Só entra por env/secret.
 - O `runReport` aqui pede 4 relatórios (totais, série diária, top páginas, top
   países). Trocar as métricas e dimensões é só editar os `runReport` no script.
-- A série `daily` acumula no `analytics.json`: a cada run só os últimos 7 dias
-  são refeitos. Apague o arquivo para reconstruir do zero (limitado à janela de
-  28 dias do relatório diário).
+- A série `daily` acumula no `analytics.json`: a cada run a janela de hoje + os
+  7 dias anteriores (8 datas) é refeita. Apague o arquivo para reconstruir do
+  zero — só volta o que couber nessa janela (hoje + 7), não os 28 dias dos
+  totais.

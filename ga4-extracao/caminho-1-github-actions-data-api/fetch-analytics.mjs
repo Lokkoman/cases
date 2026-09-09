@@ -4,11 +4,11 @@
 // account com node:crypto e troca por um access token.
 //
 // Janela de reprocessamento: a série `daily` é histórico acumulado no
-// próprio analytics.json. A cada execução só os últimos
-// HISTORY_REFRESH_DAYS dias são buscados de novo e sobrescritos, o resto
-// do histórico é preservado (o GA4 ainda corrige dado recente por alguns
-// dias). Os totais e os rankings são uma janela móvel de RANGE_DAYS dias,
-// sempre refeitos por inteiro.
+// próprio analytics.json. A cada execução a janela de hoje + os
+// HISTORY_REFRESH_DAYS dias anteriores é buscada de novo e sobrescrita
+// (a de hoje entra parcial), o resto do histórico é preservado (o GA4
+// ainda corrige dado recente por alguns dias). Os totais e os rankings
+// são uma janela móvel de RANGE_DAYS dias, sempre refeitos por inteiro.
 //
 // Uso:
 //   GA4_PROPERTY_ID=123456789 \
@@ -21,7 +21,7 @@ import { readFileSync } from 'node:fs';
 const PROPERTY_ID = process.env.GA4_PROPERTY_ID;
 const PROPERTY_LABEL = process.env.GA4_PROPERTY_LABEL || '';
 const RANGE_DAYS = 28; // janela móvel dos totais e rankings
-const HISTORY_REFRESH_DAYS = 7; // dias da série diária reprocessados a cada run
+const HISTORY_REFRESH_DAYS = 7; // dias anteriores a hoje refeitos na série diária (janela = hoje + estes)
 
 // analytics.json fica ao lado deste script
 const OUT_URL = new URL('./analytics.json', import.meta.url);
