@@ -1,4 +1,4 @@
-# Caminho 5 — Fabric + Airflow + GA4 Data API
+# Caminho 5 — Microsoft Fabric + Airflow + GA4 Data API
 
 O [caminho 1](../caminho-1-github-actions-data-api/) (GA4 Data API) rodando
 dentro de um Notebook do Microsoft Fabric que grava tabelas Delta num Lakehouse.

@@ -48,7 +48,7 @@ Fabric); o 1 não tem nuvem de dados, roda no CI do GitHub.
 | Saída | JSON no repositório | Delta: bronze **+ prata** (Unity Catalog) | Delta: bronze (Lakehouse / OneLake) |
 | Segredo | GitHub secret | Databricks secret scope | Azure Key Vault + service principal |
 | Custo | grátis, dentro da cota da API | compute do Databricks | capacidade do Fabric |
-| Pasta | `caminho-1-github-actions-data-api/` | `caminho-4-azure-databricks-data-api/` | `caminho-5-fabric-airflow-data-api/` |
+| Pasta | `caminho-1-github-actions-data-api/` | `caminho-4-azure-databricks-data-api/` | `caminho-5-microsoft-fabric-airflow-data-api/` |
 
 ### Via BigQuery — caminhos 2, 3
 
@@ -63,7 +63,7 @@ só configuração de console.
 | Frequência | streaming + tabela diária | a cada 24h, com janela de reprocessamento |
 | Autenticação | conta Google com acesso à propriedade (1 clique) | conta Google (OAuth, 1 vez) |
 | Custo | armazenamento no BigQuery | armazenamento no BigQuery |
-| Pasta | `caminho-2-bigquery-export-nativo/` (config + SQL) | `caminho-3-bigquery-data-transfer-service/` (config + SQL) |
+| Pasta | `caminho-2-google-bigquery-export-nativo/` (config + SQL) | `caminho-3-google-bigquery-data-transfer-service/` (config + SQL) |
 
 ---
 
@@ -110,7 +110,7 @@ Código: [`caminho-1-github-actions-data-api/`](caminho-1-github-actions-data-ap
 
 ---
 
-## Caminho 2 — BigQuery + export nativo GA4
+## Caminho 2 — Google BigQuery + export nativo GA4
 
 O link nativo. O Google escreve o **evento cru** direto num dataset seu no
 BigQuery, sem você programar nada. É a base para qualquer modelagem séria
@@ -137,7 +137,7 @@ Um registro por evento, no schema padrão do GA4, em inglês:
 
 Pegar um parâmetro exige `UNNEST(event_params)`. Exemplo de leitura (só ler o
 cru, sem modelar) em
-[`caminho-2-bigquery-export-nativo/exemplo.sql`](caminho-2-bigquery-export-nativo/exemplo.sql).
+[`caminho-2-google-bigquery-export-nativo/exemplo.sql`](caminho-2-google-bigquery-export-nativo/exemplo.sql).
 
 ### Custo
 
@@ -151,11 +151,11 @@ Google vem "pronto" aqui: é matéria-prima. É de onde sai a tabela
 `dados_tratados` (16 dimensões, 21 métricas) que os caminhos 4 e 5 tentam
 reproduzir pela Data API.
 
-Detalhes: [`caminho-2-bigquery-export-nativo/`](caminho-2-bigquery-export-nativo/)
+Detalhes: [`caminho-2-google-bigquery-export-nativo/`](caminho-2-google-bigquery-export-nativo/)
 
 ---
 
-## Caminho 3 — BigQuery + Data Transfer Service
+## Caminho 3 — Google BigQuery + Data Transfer Service
 
 O BigQuery tem um conector **"Google Analytics 4"** no Data Transfer Service que
 puxa as **tabelas de relatório prontas** do GA4, as mesmas da biblioteca de
@@ -184,7 +184,7 @@ relatório vem em **dupla**:
 
 Exemplos: `ga4_TrafficAcquisition_<ID>`, `ga4_PagesAndScreens_<ID>`,
 `ga4_Events_<ID>`. Consulta de exemplo em
-[`caminho-3-bigquery-data-transfer-service/exemplo.sql`](caminho-3-bigquery-data-transfer-service/exemplo.sql).
+[`caminho-3-google-bigquery-data-transfer-service/exemplo.sql`](caminho-3-google-bigquery-data-transfer-service/exemplo.sql).
 
 ### Custo
 
@@ -196,7 +196,7 @@ armazenamento das tabelas.
 Ter rápido, sem escrever SQL de modelagem, os números que o GA4 já mostra na
 tela, num lugar onde dá para juntar com outras fontes. Não te dá o evento cru.
 
-Detalhes: [`caminho-3-bigquery-data-transfer-service/`](caminho-3-bigquery-data-transfer-service/)
+Detalhes: [`caminho-3-google-bigquery-data-transfer-service/`](caminho-3-google-bigquery-data-transfer-service/)
 
 ---
 
@@ -216,7 +216,7 @@ Detalhes e código: [`caminho-4-azure-databricks-data-api/`](caminho-4-azure-dat
 
 ---
 
-## Caminho 5 — Fabric + Airflow + GA4 Data API
+## Caminho 5 — Microsoft Fabric + Airflow + GA4 Data API
 
 O mesmo caminho, outra stack, com o foco na **orquestração**. A extração roda num
 **Notebook do Microsoft Fabric** (Spark), gravando Delta num **Lakehouse**. O
@@ -233,7 +233,7 @@ métricas da tratada do BigQuery — ficam de fora `paginas_distintas` e
 Stack: Apache Airflow · Docker · Microsoft Fabric · Lakehouse / OneLake · Delta
 Lake · GA4 Data API · Entra ID service principal · Azure Key Vault · REST.
 
-Detalhes e código: [`caminho-5-fabric-airflow-data-api/`](caminho-5-fabric-airflow-data-api/)
+Detalhes e código: [`caminho-5-microsoft-fabric-airflow-data-api/`](caminho-5-microsoft-fabric-airflow-data-api/)
 
 ---
 

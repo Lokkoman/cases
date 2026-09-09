@@ -1,4 +1,4 @@
-# Caminho 3 — Data Transfer Service (conector GA4)
+# Caminho 3 — Google BigQuery + Data Transfer Service
 
 O BigQuery tem um conector **"Google Analytics 4"** no Data Transfer Service que
 puxa as **tabelas de relatório prontas** do GA4 — as mesmas da biblioteca de

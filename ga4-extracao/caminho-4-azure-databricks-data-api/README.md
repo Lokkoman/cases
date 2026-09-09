@@ -101,7 +101,7 @@ Pré-requisitos:
 
 Mesma família (GA4 Data API → lakehouse Delta). Aqui: as 9 bronze **e** a prata
 cruzada, no ecossistema nativo do Databricks (Unity Catalog, secret scope).
-[Lá](../caminho-5-fabric-airflow-data-api/): as 9 bronze, ainda sem prata, mas com
+[Lá](../caminho-5-microsoft-fabric-airflow-data-api/): as 9 bronze, ainda sem prata, mas com
 **Airflow externo** orquestrando o Fabric por service principal. Um mostra
 modelagem em camadas completa; o outro, o orquestrador que qualquer empresa fora
 do Databricks reconhece.
