@@ -48,7 +48,7 @@ Fabric); o 1 não tem nuvem de dados, roda no CI do GitHub.
 | Saída | JSON no repositório | Delta: bronze **+ prata** (Unity Catalog) | Delta: bronze (Lakehouse / OneLake) |
 | Segredo | GitHub secret | Databricks secret scope | Azure Key Vault + service principal |
 | Custo | grátis, dentro da cota da API | compute do Databricks | capacidade do Fabric |
-| Pasta | `caminho-1-github-actions-data-api/` | `caminho-4-azure-databricks-data-api/` | `caminho-5-microsoft-fabric-airflow-data-api/` |
+| Pasta | `caminho-1-github-actions-data-api/` | `caminho-4-microsoft-azure-databricks-data-api/` | `caminho-5-microsoft-fabric-airflow-data-api/` |
 
 ### Via BigQuery — caminhos 2, 3
 
@@ -200,7 +200,7 @@ Detalhes: [`caminho-3-google-bigquery-data-transfer-service/`](caminho-3-google-
 
 ---
 
-## Caminho 4 — Azure Databricks + GA4 Data API
+## Caminho 4 — Microsoft Azure Databricks + GA4 Data API
 
 O caminho 1 virado pipeline de engenharia. A mesma GA4 Data API, agora em
 **PySpark no Azure Databricks**, gravando **Delta Lake** governado pelo **Unity
@@ -212,7 +212,7 @@ pivota os eventos em coluna e cruza tudo, com checagem de que a soma bate).
 Stack: GA4 Data API · Databricks · PySpark · Delta Lake · Unity Catalog · secret
 scope · Serverless SQL Warehouse.
 
-Detalhes e código: [`caminho-4-azure-databricks-data-api/`](caminho-4-azure-databricks-data-api/)
+Detalhes e código: [`caminho-4-microsoft-azure-databricks-data-api/`](caminho-4-microsoft-azure-databricks-data-api/)
 
 ---
 

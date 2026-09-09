@@ -1,4 +1,4 @@
-# Caminho 4 — Azure Databricks + GA4 Data API
+# Caminho 4 — Microsoft Azure Databricks + GA4 Data API
 
 Extração do GA4 do site raulpavao.com.br (propriedade `552236564`) direto pela
 **GA4 Data API** — sem passar pelo BigQuery — rodando em **PySpark no Azure

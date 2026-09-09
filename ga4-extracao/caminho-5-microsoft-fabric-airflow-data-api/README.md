@@ -79,7 +79,7 @@ BigQuery (`dados_tratados`). Ficam de fora, por limite da Data API:
 
 A camada **prata** (agregar cada bronze pra chave de 5, cruzar e pivotar
 eventos em coluna, igual ao `dados_tratados` do BigQuery) ainda não está aqui.
-No [caminho 4](../caminho-4-azure-databricks-data-api/) ela existe.
+No [caminho 4](../caminho-4-microsoft-azure-databricks-data-api/) ela existe.
 
 A chave da service account vem do Key Vault por
 `notebookutils.credentials.getSecret`, nunca fica no código.
