@@ -12,8 +12,8 @@ dimensão se aplica**, todo campo está em toda linha.
 
 | Arquivo | O que é |
 |---|---|
-| `exemplo.sql` | leitura do cru (`UNNEST` em `event_params`) + a sessionização enxuta que reproduz o `fato_sessoes` de 9 dimensões (paridade com os caminhos 2, 5 e 6) |
-| `fato_sessoes_completo.sql` | a base **sem teto**: ~32 dimensões (atribuição last-click completa, device + versão, browser + versão, geo até `metro`, landing + referrer) e ~35 métricas (engajamento, funil, eventos padrão, e-commerce) numa tabela só |
+| `exemplo.sql` | como o evento cru se parece: `UNNEST` em `event_params`, eventos por dia/nome |
+| `fato_sessoes.sql` | a base **sem teto**, montada por SQL: `CREATE OR REPLACE VIEW dados_tratados.fato_sessoes` — ~50 dimensões (atribuição last-click completa + Google Ads + primeiro toque, device e browser com versão, geo até `metro`, landing/exit page + referrer, hora local) e ~50 métricas (engajamento, funil completo, eventos padrão, e-commerce nível transação). Cada linha traz `_source_dataset` / `_source_table` / `_extracted_at`. |
 
 ## Como montar
 
@@ -43,23 +43,27 @@ Um registro por evento, no schema padrão do GA4 (em inglês):
 
 ## Do evento cru pro `fato_sessoes`
 
-Os caminhos 2, 5 e 6 pegam o `fato_sessoes` pronto da Data API (limitado a 9
-dimensões). Aqui você **constrói** o mesmo com SQL, e sem teto de dimensão:
+Os caminhos 2, 5 e 6 pegam o `fato_sessoes` pronto da Data API — **9 dimensões**,
+o teto de uma chamada. Aqui você **constrói** com SQL, e a única fronteira é o
+schema do evento cru. Passos (o `fato_sessoes.sql` faz tudo):
 
-1. **Sessioniza** — agrupa por `user_pseudo_id` + `ga_session_id` (parâmetro de
-   `event_params`).
-2. **Last click** — pega `session_traffic_source_last_click.manual_campaign.*` e
-   `.cross_channel_campaign.*` (canal, origem, mídia, campanha, `campaign_id`,
-   `manual_content`).
-3. **Device / geo** — são constantes na sessão; pega de qualquer evento dela.
-4. **Landing page** — o `page_location` do primeiro `page_view` da sessão.
-5. **Métricas** — `sessions` = 1 por sessão; `engagedSessions` de
-   `session_engaged`; `screenPageViews` = contagem de `page_view`; funil e
-   e-commerce por `COUNTIF(event_name = '...')`; etc.
+1. **Sessioniza** — agrupa por `user_pseudo_id` + `ga_session_id`.
+2. **Last click** — `session_traffic_source_last_click` (`manual_campaign.*`,
+   `cross_channel_campaign.*`, `google_ads_campaign.*`).
+3. **Primeiro toque** — `traffic_source` (user-scoped, constante).
+4. **Device / geo** — constantes na sessão; `ANY_VALUE`.
+5. **Páginas** — `page_location` do primeiro `page_view` (landing), do último
+   (exit), `page_referrer` da entrada.
+6. **Métricas** — `sessions` = 1; engajamento de `session_engaged` /
+   `engagement_time_msec`; funil e e-commerce por `COUNTIF(event_name = '...')`
+   e `SUM(ecommerce.*)`.
 
-O `exemplo.sql` para nas 9 dimensões (paridade com os outros caminhos). O
-`fato_sessoes_completo.sql` vai até onde o evento cru deixa: ~32 dimensões e
-~35 métricas numa tabela só — é a resposta pra "qual base junta mais informação".
+Resultado: `dados_tratados.fato_sessoes` — ~50 dimensões, ~50 métricas numa
+tabela só. É a resposta pra "qual base junta mais informação".
+
+É uma **view** (sem armazenamento, sempre fresca). Pra alimentar um BI que
+consulta muito, materialize: `CREATE TABLE ... AS SELECT * FROM
+dados_tratados.fato_sessoes` + uma consulta programada diária.
 
 ## Custo
 

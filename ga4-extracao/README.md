@@ -175,9 +175,12 @@ blocos `device`, `geo`, `traffic_source`, `collected_traffic_source`,
 `session_traffic_source_last_click`, `ecommerce`.
 
 Do evento cru você monta o `fato_sessoes` por SQL — sessioniza por
-`ga_session_id`, pega o last-click, herda device/geo, deriva a landing page — e
-aqui **não há teto de 9 dimensões**. A query está em
-[`caminho-3-google-bigquery-export-nativo/exemplo.sql`](caminho-3-google-bigquery-export-nativo/exemplo.sql).
+`ga_session_id`, pega o last-click, herda device/geo, deriva landing/exit page —
+e aqui **não há teto de 9 dimensões**: a
+[`fato_sessoes.sql`](caminho-3-google-bigquery-export-nativo/fato_sessoes.sql)
+cria uma view `dados_tratados.fato_sessoes` com ~50 dimensões e ~50 métricas
+(atribuição completa, Google Ads, primeiro toque, funil e-commerce). É a base
+com mais informação numa tabela só entre os 6 caminhos.
 
 ### Custo
 
