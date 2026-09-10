@@ -4,16 +4,16 @@ O link nativo do GA4 pro BigQuery. O Google escreve o **evento cru** direto num
 dataset seu, sem você programar nada. É o grão mais fino possível — a base pra
 qualquer modelagem (sessão, atribuição, funil).
 
-Este caminho não tem código: é configuração de console. O `exemplo.sql` mostra o
-formato do dado e monta o `fato_sessoes` (o mesmo dos caminhos 2, 5 e 6) por
-SQL, já que aqui **nenhum limite de dimensão se aplica** — todo campo está em
-toda linha.
+Este caminho não tem código: é configuração de console. Os `.sql` mostram o
+formato do dado e montam a tabela de mídia por SQL — aqui **nenhum limite de
+dimensão se aplica**, todo campo está em toda linha.
 
 ## Arquivos
 
 | Arquivo | O que é |
 |---|---|
-| `exemplo.sql` | leitura do cru (`UNNEST` em `event_params`) + a query de sessionização que reproduz o `fato_sessoes` |
+| `exemplo.sql` | leitura do cru (`UNNEST` em `event_params`) + a sessionização enxuta que reproduz o `fato_sessoes` de 9 dimensões (paridade com os caminhos 2, 5 e 6) |
+| `fato_sessoes_completo.sql` | a base **sem teto**: ~32 dimensões (atribuição last-click completa, device + versão, browser + versão, geo até `metro`, landing + referrer) e ~35 métricas (engajamento, funil, eventos padrão, e-commerce) numa tabela só |
 
 ## Como montar
 
@@ -54,10 +54,12 @@ dimensões). Aqui você **constrói** o mesmo com SQL, e sem teto de dimensão:
 3. **Device / geo** — são constantes na sessão; pega de qualquer evento dela.
 4. **Landing page** — o `page_location` do primeiro `page_view` da sessão.
 5. **Métricas** — `sessions` = 1 por sessão; `engagedSessions` de
-   `session_engaged`; `screenPageViews` = contagem de `page_view`; `keyEvents` de
-   `is_key_event`; etc.
+   `session_engaged`; `screenPageViews` = contagem de `page_view`; funil e
+   e-commerce por `COUNTIF(event_name = '...')`; etc.
 
-A query completa está no `exemplo.sql`.
+O `exemplo.sql` para nas 9 dimensões (paridade com os outros caminhos). O
+`fato_sessoes_completo.sql` vai até onde o evento cru deixa: ~32 dimensões e
+~35 métricas numa tabela só — é a resposta pra "qual base junta mais informação".
 
 ## Custo
 
