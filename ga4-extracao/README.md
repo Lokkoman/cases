@@ -38,11 +38,17 @@ chamada `runReport`.
 | | `averageSessionDuration` |
 
 Os caminhos **2, 5 e 6** pegam essa tabela pronta da Data API, numa única
-chamada `runReport`. O **caminho 3** constrói o mesmo por SQL a partir do evento
-cru, sem teto de dimensão. O **caminho 1** é um snapshot JSON leve (poucos
-números). O **caminho 4** não entrega essa tabela: cada relatório é de um tema
-só, e cruzar dois pela data atribui a métrica de um recorte a outro que nunca
-foi a mesma sessão. Enviesa.
+chamada `runReport`. O **caminho 1** é um snapshot JSON leve (poucos números).
+
+O **caminho 3** não entrega o `fato_sessoes` pronto: entrega o **evento
+vetorizado** (`dados_tratados.eventos`), um registro por evento com cada valor
+aninhado aberto em coluna e cada `event_name` num indicador `evento_<nome>`. O
+`fato_sessoes`, ou qualquer recorte, sai daí com um `GROUP BY` que soma os
+indicadores — sem teto de dimensão e sem juntar tabela com tabela.
+
+O **caminho 4** não entrega essa tabela: cada relatório é de um tema só, e
+cruzar dois pela data atribui a métrica de um recorte a outro que nunca foi a
+mesma sessão. Enviesa.
 
 ## Visão geral
 
@@ -52,7 +58,7 @@ flowchart LR
 
   ga4 -->|"1. GitHub Actions + Data API"| api["JSON no repositório git"]
   ga4 -->|"2. Google Sheets + Data API"| sh["aba fato_sessoes na planilha"]
-  ga4 -->|"3. BigQuery + export nativo"| raw["BigQuery: events_* (evento cru)"]
+  ga4 -->|"3. BigQuery + export nativo"| raw["BigQuery: dados_tratados.eventos (evento vetorizado)"]
   ga4 -->|"4. BigQuery + Data Transfer Service"| rep["BigQuery: tabelas de relatório"]
   ga4 -->|"5. Azure Databricks + Data API"| dbx["Databricks: fato_sessoes (Delta / Unity Catalog)"]
   ga4 -->|"6. Fabric + Airflow + Data API"| fab["Fabric Lakehouse: fato_sessoes (Delta)"]
@@ -80,11 +86,11 @@ só configuração de console.
 | | 3 · export nativo | 4 · Data Transfer Service |
 |---|---|---|
 | Onde configura | Admin do GA4 -> Vinculações do BigQuery | BigQuery -> Transferências -> conector "Google Analytics 4" |
-| O que sai | evento cru, um registro por evento | tabelas de relatório já agregadas, uma por tema |
+| O que sai | evento cru → view `dados_tratados.eventos` (evento vetorizado, 1 linha por evento) | tabelas de relatório já agregadas, uma por tema |
 | Frequência | streaming + tabela diária | a cada 24h, com janela de reprocessamento |
 | Autenticação | conta Google com acesso à propriedade (1 clique) | conta Google (OAuth, 1 vez) |
 | Custo | armazenamento no BigQuery (+ inserção, só no streaming) | armazenamento no BigQuery |
-| `fato_sessoes`? | sim, por SQL de sessionização (sem teto de dims) | não: relatórios de tema único, cruzar dois enviesa |
+| `fato_sessoes`? | não direto: entrega o evento vetorizado, e o `fato_sessoes` é um `GROUP BY` por cima (sem teto de dims) | não: relatórios de tema único, cruzar dois enviesa |
 | Pasta | `caminho-3-google-bigquery-export-nativo/` | `caminho-4-google-bigquery-data-transfer-service/` |
 
 ---
@@ -155,7 +161,17 @@ Detalhes e config: [`caminho-2-google-sheets-ga4-reports-builder/`](caminho-2-go
 
 O link nativo. O Google escreve o **evento cru** direto num dataset seu no
 BigQuery, sem você programar nada. É a base para qualquer modelagem séria
-(sessão, atribuição, funil), porque vem no grão mais fino possível.
+(sessão, atribuição, funil), porque vem no grão mais fino possível: um registro
+por evento, com todo parâmetro em toda linha.
+
+A extração é **uma consulta só**: a `eventos.sql` cria a view
+`dados_tratados.eventos` achatando o `events_*` sem mudar o grão. Cada `STRUCT`
+aninhado abre numa coluna (`device_web_info_browser`, `geo_city`,
+`session_traffic_source_last_click_manual_campaign_source`…), cada chave de
+`event_params` abre numa coluna `param_<chave>`, e cada `event_name` vira um
+indicador `evento_<nome>` (1 na linha daquele evento). Nada agregado, nada
+sessionizado — somar os indicadores num `GROUP BY` dá a contagem de cada evento
+em qualquer recorte, sem pivô e sem join.
 
 ### Como montar
 
@@ -176,13 +192,13 @@ Um registro por evento, no schema padrão do GA4: `event_name`, `event_params`
 blocos `device`, `geo`, `traffic_source`, `collected_traffic_source`,
 `session_traffic_source_last_click`, `ecommerce`.
 
-Do evento cru você monta o `fato_sessoes` por SQL — sessioniza por
-`ga_session_id`, pega o last-click, herda device/geo, deriva landing/exit page —
-e aqui **não há teto de 9 dimensões**: a
-[`fato_sessoes.sql`](caminho-3-google-bigquery-export-nativo/fato_sessoes.sql)
-cria uma view `dados_tratados.fato_sessoes` com ~50 dimensões e ~50 métricas
-(atribuição completa, Google Ads, primeiro toque, funil e-commerce). É a base
-com mais informação numa tabela só entre os 6 caminhos.
+A [`eventos.sql`](caminho-3-google-bigquery-export-nativo/eventos.sql) entrega
+essa view. Dela você monta o `fato_sessoes` (ou qualquer tabela) com um
+`GROUP BY user_pseudo_id, param_ga_session_id` que soma os `evento_<nome>` e os
+`param_*` — cada número vem de eventos que de fato aconteciam naquela sessão,
+sem `ANY_VALUE` chutando atributo e **sem teto de 9 dimensões**. Essa modelagem
+é o passo seguinte e fica fora do escopo do case. É a base com mais informação
+entre os 6 caminhos.
 
 ### Custo
 
@@ -283,7 +299,9 @@ Detalhes e código: [`caminho-6-microsoft-fabric-airflow-data-api/`](caminho-6-m
 
 ## O que vem depois
 
-Todo caminho para na extração. O que vem depois — modelagem em camadas, tabela
+Todo caminho para na extração. O que vem depois (modelagem em camadas, tabela
 tratada por sessão e por campanha, modelo semântico, dashboards, recortes de
-negócio — é o mesmo trabalho seja qual for a fonte, e fica fora do escopo deste
-case. O `fato_sessoes` já é o suficiente pra ligar num Looker Studio ou Power BI.
+negócio) é o mesmo trabalho seja qual for a fonte, e fica fora do escopo deste
+case. O `fato_sessoes` dos caminhos 2, 5 e 6 já liga direto num Looker Studio ou
+Power BI; o `dados_tratados.eventos` do caminho 3 é a matéria-prima pra montar
+esse `fato_sessoes` (ou qualquer outro recorte) com um `GROUP BY`.

@@ -22,7 +22,8 @@ Glossário do que os cases usam. Marca de onde cada termo aparece:
 
 | Termo | O que é |
 |---|---|
-| **`fato_sessoes` (tabela de mídia)** `[SH] [DBX] [FAB]` | Uma linha por combinação das 9 dimensões mais úteis pra mídia (`date`, canal, origem, mídia, `sessionManualAdContent`, `sessionCampaignId`, `operatingSystem`, `city`, `landingPagePlusQueryString`) + 10 métricas. É o teto de uma chamada `runReport`. Os caminhos 2, 5 e 6 pegam essa tabela pronta; o caminho 3 constrói o mesmo por SQL, sem teto de dimensão. |
+| **`fato_sessoes` (tabela de mídia)** `[SH] [DBX] [FAB]` | Uma linha por combinação das 9 dimensões mais úteis pra mídia (`date`, canal, origem, mídia, `sessionManualAdContent`, `sessionCampaignId`, `operatingSystem`, `city`, `landingPagePlusQueryString`) + 10 métricas. É o teto de uma chamada `runReport`. Os caminhos 2, 5 e 6 pegam essa tabela pronta; no caminho 3 ela é um `GROUP BY` sobre o evento vetorizado. |
+| **Evento vetorizado (`dados_tratados.eventos`)** `[BQ]` | A saída do caminho 3: o `events_*` achatado numa view, um registro por evento, sem agregar. Cada `STRUCT` vira `<caminho>_<campo>`, cada chave de `event_params` vira `param_<chave>`, cada `event_name` vira um indicador `evento_<nome>` (1 na linha daquele evento). Somar os indicadores num `GROUP BY` dá qualquer recorte sem pivô e sem join. |
 | **Chave de atribuição** `[SH] [DBX] [FAB] [BQ]` | As 5 primeiras dimensões da tabela: `date, sessionDefaultChannelGroup, sessionSource, sessionMedium, sessionCampaignName` (ou `sessionCampaignId`). É o recorte de "de onde veio a sessão". Na sessionização por SQL (caminho 3) sai do `session_traffic_source_last_click`. |
 | **Grão (granularidade)** `[todos]` | O nível de detalhe de uma linha. O `fato_sessoes` é grão de 9 dimensões (uma linha por combinação). O evento cru é grão de evento — o mais fino possível, dá pra `GROUP BY` qualquer coisa. Quanto mais fino o grão, mais linhas e mais detalhe. |
 | **Camada / medallion (bronze, prata, ouro)** `[DBX] [FAB]` | Convenção de lakehouse: bronze = cru, prata = tratado/cruzado, ouro = recortes de negócio. **Estes cases param na extração** — o `fato_sessoes` já é uma tabela de consumo, sem camadas por cima. A modelagem em camadas seria o passo seguinte, igual pra qualquer fonte. |
@@ -82,6 +83,6 @@ Glossário do que os cases usam. Marca de onde cada termo aparece:
 
 | | Teto de completude |
 |---|---|
-| **Evento cru (BQ export nativo)** | ilimitado: todo parâmetro está em toda linha, dá pra `GROUP BY` qualquer combinação. O `fato_sessoes` sai daqui por SQL, com quantas dimensões quiser, numa consulta só. |
+| **Evento cru (BQ export nativo)** | ilimitado: todo parâmetro está em toda linha, dá pra `GROUP BY` qualquer combinação. A view `dados_tratados.eventos` abre isso em colunas numa consulta só; o `fato_sessoes`, ou qualquer recorte, é um `GROUP BY` por cima, sem teto de dimensão. |
 | **GA4 Data API** (GitHub Actions, Sheets, Databricks, Fabric) | 9 dimensões / 10 métricas por chamada. O `fato_sessoes` usa exatamente esse teto, numa única `runReport`. Pra cobrir mais numa tabela só, tem que ir pro evento cru: rodar duas chamadas e juntar espalha a métrica de um recorte pelo outro. |
 | **Tabelas de relatório (Data Transfer Service)** | fixo no que o Google entrega, cada relatório num tema. Juntar dois pela data cola números de sessões diferentes na mesma linha e enviesa. Não monta o `fato_sessoes`. |

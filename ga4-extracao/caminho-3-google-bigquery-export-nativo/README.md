@@ -1,25 +1,25 @@
 # Caminho 3 — Export nativo GA4 → BigQuery
 
 O link nativo do GA4 pro BigQuery. O Google escreve o **evento cru** direto num
-dataset seu, sem você programar nada. É o grão mais fino possível: a base pra
-qualquer modelagem de sessão, atribuição ou funil.
+dataset seu, sem você programar nada. É o grão mais fino possível: um registro
+por evento, com todo parâmetro em toda linha.
 
-Porque cada dimensão está em cada linha de evento, o `fato_sessoes` sai de **uma
-consulta só**, sem juntar tabelas. Juntar dois agregados de temas diferentes
-espalha a métrica de um recorte pelo outro e enviesa a análise; aqui a soma
-acontece depois de prender cada evento à sua sessão, então cada número fica no
-recorte a que pertence.
+A extração aqui é **uma consulta só** sobre `events_*`, sem juntar tabela com
+tabela. Cada `STRUCT` aninhado abre numa coluna, cada chave de `event_params`
+abre numa coluna `param_<chave>`, e cada `event_name` vira um indicador
+`evento_<nome>` (1 na linha daquele evento). Nada é agregado nem sessionizado,
+então nenhum número é atribuído ao balde errado. Sessão, atribuição e funil se
+montam **depois**, a partir dessa base, somando os indicadores no grão que
+quiser.
 
-Este caminho não tem código: é configuração de console. Os `.sql` mostram o
-formato do dado e montam a tabela de mídia por SQL, sem nenhum limite de
-dimensão.
+Este caminho não tem código: é configuração de console mais um `.sql`.
 
 ## Arquivos
 
 | Arquivo | O que é |
 |---|---|
 | `exemplo.sql` | como o evento cru se parece: `UNNEST` em `event_params`, eventos por dia/nome |
-| `fato_sessoes.sql` | a base **sem teto**, montada por SQL: `CREATE OR REPLACE VIEW dados_tratados.fato_sessoes` — ~50 dimensões (atribuição last-click completa + Google Ads + primeiro toque, device e browser com versão, geo até `metro`, landing/exit page + referrer, hora local) e ~50 métricas (engajamento, funil completo, eventos padrão, e-commerce nível transação). Cada linha traz `_source_dataset` / `_source_table` / `_extracted_at`. |
+| `eventos.sql` | `CREATE OR REPLACE VIEW dados_tratados.eventos` — o `events_*` vetorizado: uma linha por evento, uma coluna por valor. `device` / `geo` / `session_traffic_source_last_click` / `traffic_source` / `privacy_info` abrem em `<caminho>_<campo>`; cada chave de `event_params` em `param_<chave>`; cada `event_name` num indicador `evento_<nome>`. Primeira coluna `registro_origem` = `analytics_<id>.events_<AAAAMMDD>`. |
 
 ## Como montar
 
@@ -33,53 +33,57 @@ dimensão.
    - ou as duas
 4. Em algumas horas aparece o dataset `analytics_<ID_DA_PROPRIEDADE>` com
    `events_YYYYMMDD` (dia fechado) e `events_intraday_YYYYMMDD` (dia corrente).
+5. Rodar o `eventos.sql` (ajustando o `_TABLE_SUFFIX` e a lista de
+   `evento_<nome>` pra sua propriedade). Sai a view `dados_tratados.eventos`.
 
-## O que sai
+## O que sai do `events_*`
 
 Um registro por evento, no schema padrão do GA4 (em inglês):
 
 | Campo | Conteúdo |
 |---|---|
 | `event_name`, `event_date`, `event_timestamp` | qual evento, quando |
-| `event_params` | array aninhado de `key` / `value` — os parâmetros do evento (page_location, ga_session_id, etc.). Pega com `UNNEST` |
+| `event_params` | array aninhado de `key` / `value` — os parâmetros do evento (`page_location`, `ga_session_id`, etc.). Pega com `UNNEST` |
 | `user_pseudo_id` | identificador do dispositivo |
 | `device`, `geo` | blocos de dispositivo e geografia |
 | `traffic_source`, `collected_traffic_source`, `session_traffic_source_last_click` | atribuição em três recortes |
 | `ecommerce`, `items` | receita e itens |
 
-## Do evento cru pro `fato_sessoes`
+## O que o `eventos.sql` faz
 
-Os caminhos 2, 5 e 6 pegam o `fato_sessoes` pronto da Data API, com **9
-dimensões**, o teto de uma chamada. Aqui você **constrói** com SQL, e a única
-fronteira é o schema do evento cru. Passos (o `fato_sessoes.sql` faz tudo):
+Achata tudo isso numa view sem mudar o grão:
 
-1. **Sessioniza**: agrupa por `user_pseudo_id` + `ga_session_id`.
-2. **Last click**: `session_traffic_source_last_click` (`manual_campaign.*`,
-   `cross_channel_campaign.*`, `google_ads_campaign.*`).
-3. **Primeiro toque**: `traffic_source` (user-scoped, constante).
-4. **Device / geo**: constantes na sessão; `ANY_VALUE`.
-5. **Páginas**: `page_location` do primeiro `page_view` (landing), do último
-   (exit), `page_referrer` da entrada.
-6. **Métricas**: `sessions` = 1; engajamento de `session_engaged` /
-   `engagement_time_msec`; funil e e-commerce por `COUNTIF(event_name = '...')`
-   e `SUM(ecommerce.*)`.
+1. **STRUCTs viram colunas** — `device.web_info.browser` →
+   `device_web_info_browser`, `geo.city` → `geo_city`, e assim por diante.
+2. **`event_params` vira `param_<chave>`** — uma coluna por chave padrão do GA4
+   (`param_ga_session_id`, `param_page_location`, `param_engagement_time_msec`…).
+3. **`event_name` vira indicador** — `evento_page_view`, `evento_scroll`,
+   `evento_session_start`… com `1` na linha daquele evento e `0` nas outras.
+   Somar esses indicadores dá a contagem de cada evento em qualquer recorte, sem
+   pivô e sem join.
+4. **`registro_origem`** — a tabela diária de onde a linha veio.
 
-Tudo isso numa consulta só, sobre a mesma tabela de eventos. Resultado:
-`dados_tratados.fato_sessoes`, ~50 dimensões e ~50 métricas numa tabela só, cada
-número no recorte a que pertence.
+`items` (linha de produto do e-commerce) muda o grão, então fica de fora da
+view principal — abra num `CROSS JOIN UNNEST(items)` à parte quando precisar.
 
-É uma **view** (sem armazenamento, sempre fresca). Pra alimentar um BI que
-consulta muito, materialize: `CREATE TABLE ... AS SELECT * FROM
-dados_tratados.fato_sessoes` + uma consulta programada diária.
+## Do evento pra sessão
+
+`dados_tratados.eventos` é a matéria-prima. Uma tabela por sessão sai daí com um
+`GROUP BY user_pseudo_id, param_ga_session_id` somando os `evento_<nome>` e os
+`param_*` — cada número vem de eventos que **de fato** aconteciam naquela sessão,
+sem `ANY_VALUE` chutando atributo nem join de agregado. Essa modelagem é o passo
+seguinte e fica fora do escopo deste case (que para na extração).
 
 ## Custo
 
 Só armazenamento no BigQuery. Streaming tem um custo pequeno de inserção; a
-exportação diária é grátis.
+exportação diária é grátis. A view relê `events_*` a cada consulta; pra um BI
+que consulta muito, materialize: `CREATE TABLE … AS SELECT * FROM
+dados_tratados.eventos` + uma consulta programada diária.
 
 ## Serve para
 
-Quando você quer o dado no grão do evento pra modelar do seu jeito, ou uma
-tabela de mídia com **mais de 9 dimensões**. Nada do Google vem "pronto" aqui:
-é matéria-prima. Consultar exige `UNNEST` e `_TABLE_SUFFIX` pra filtrar as
-tabelas diárias.
+Quando você quer o dado no grão do evento pra modelar do seu jeito, sem herdar
+nenhuma decisão de modelagem do Google. É a base com mais informação entre os 6
+caminhos. Consultar exige `UNNEST` e `_TABLE_SUFFIX` pra filtrar as tabelas
+diárias.

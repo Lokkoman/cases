@@ -1,5 +1,5 @@
 -- Caminho 3: como o evento cru do export nativo GA4 -> BigQuery se parece.
--- Só leitura, sem modelagem. A base de sessão está em fato_sessoes.sql.
+-- Só leitura, sem modelagem. A view vetorizada está em eventos.sql.
 --
 -- Troque:  SEU_PROJETO  analytics_XXXXXXXXX  (dataset do export)
 
