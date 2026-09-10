@@ -7,6 +7,11 @@
 --
 -- As colunas vêm em camelCase e a data de partição é `_DATA_DATE`.
 -- Troque:  SEU_PROJETO  SEU_DATASET  XXXXXXXXX (id da propriedade)
+--
+-- Cada consulta lê UMA tabela. Não junte duas por _DATA_DATE: colar
+-- TrafficAcquisition com PagesAndScreens pela data repete a métrica de um
+-- recorte em cada valor do outro e enviesa a leitura. Pra cruzar dimensões
+-- numa linha só, é o evento cru do caminho 3.
 
 -- 1) Aquisição de tráfego por canal, últimos 28 dias.
 --    (Traffic Acquisition é session-scoped: não tem métrica de usuários.)

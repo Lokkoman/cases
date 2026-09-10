@@ -82,6 +82,6 @@ Glossário do que os cases usam. Marca de onde cada termo aparece:
 
 | | Teto de completude |
 |---|---|
-| **Evento cru (BQ export nativo)** | ilimitado — todo parâmetro está em toda linha, dá pra `GROUP BY` qualquer combinação. O `fato_sessoes` sai daqui por SQL, com quantas dimensões quiser. |
-| **GA4 Data API** (GitHub Actions, Sheets, Databricks, Fabric) | 9 dimensões / 10 métricas por chamada. O `fato_sessoes` usa exatamente esse teto. Pra cobrir mais numa tabela só, tem que ir pro evento cru. |
-| **Tabelas de relatório (Data Transfer Service)** | fixo no que o Google entrega — cada relatório num tema, sem cruzamento livre de dimensões. Não monta o `fato_sessoes`. |
+| **Evento cru (BQ export nativo)** | ilimitado: todo parâmetro está em toda linha, dá pra `GROUP BY` qualquer combinação. O `fato_sessoes` sai daqui por SQL, com quantas dimensões quiser, numa consulta só. |
+| **GA4 Data API** (GitHub Actions, Sheets, Databricks, Fabric) | 9 dimensões / 10 métricas por chamada. O `fato_sessoes` usa exatamente esse teto, numa única `runReport`. Pra cobrir mais numa tabela só, tem que ir pro evento cru: rodar duas chamadas e juntar espalha a métrica de um recorte pelo outro. |
+| **Tabelas de relatório (Data Transfer Service)** | fixo no que o Google entrega, cada relatório num tema. Juntar dois pela data cola números de sessões diferentes na mesma linha e enviesa. Não monta o `fato_sessoes`. |

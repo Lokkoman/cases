@@ -47,13 +47,20 @@ nada além. Alguns dos que aparecem:
 
 ## Não dá pra montar o `fato_sessoes` aqui
 
-O `fato_sessoes` dos caminhos 2, 5 e 6 cruza aquisição **+** device **+** cidade
-**+** landing page na mesma linha. No Data Transfer Service esses vivem em
-tabelas separadas, cada uma pré-agregada no seu tema, e a única coisa em comum
-entre elas é a data de partição. Juntar `TrafficAcquisition` com `TechDetails`
-por data dá explosão cartesiana (cada campanha × cada device do dia) e não há
-chave pra reconciliar. `sessionCampaignId` e `sessionManualAdContent` sequer
-existem no DTS. Cruzamento livre de dimensões só no evento cru
+O `fato_sessoes` dos caminhos 2, 5 e 6 traz aquisição, device, cidade e landing
+page na mesma linha porque a Data API agrega **depois** de saber a que sessão
+cada evento pertence. No Data Transfer Service cada tema já chega agregado
+sozinho, e a única coisa em comum entre as tabelas é a data.
+
+Juntar `TrafficAcquisition` com `TechDetails` por data não é só explosão
+cartesiana. As 100 sessões de `Organic` do dia e os 40 de `iOS` do dia viram
+linhas `Organic × iOS`, `Organic × Android`, e a métrica de um recorte é
+repetida em cada valor do outro. Você passa a contar a sessão de um usuário no
+balde de outro. O número sai plausível e errado. `sessionCampaignId` e
+`sessionManualAdContent` nem existem no DTS.
+
+Uma linha com muitas dimensões só sai do evento cru, onde cada dimensão está
+presa à sessão certa antes de qualquer soma
 ([caminho 3](../caminho-3-google-bigquery-export-nativo/)).
 
 ## Custo
@@ -64,5 +71,6 @@ Só o armazenamento das tabelas.
 ## Serve para
 
 Ter rápido, sem escrever SQL de modelagem, os números que o GA4 já mostra na
-tela, num lugar onde dá pra juntar com outras fontes. **Não** te dá o evento
-cru nem cruzamento livre de dimensões — é fixo no que o Google entrega.
+tela, num lugar onde dá pra ligar com outras fontes por uma chave real (data,
+campanha) num modelo de BI. **Não** te dá o evento cru, e os relatórios não se
+cruzam entre si sem enviesar: é fixo no que o Google entrega.

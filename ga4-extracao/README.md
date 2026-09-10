@@ -37,10 +37,12 @@ chamada `runReport`.
 | `landingPagePlusQueryString` (página de entrada) | `sessionKeyEventRate` |
 | | `averageSessionDuration` |
 
-Os caminhos **2, 5 e 6** pegam essa tabela pronta da Data API. O **caminho 3**
-constrói o mesmo por SQL a partir do evento cru — e aí **sem teto de dimensão**.
-O **caminho 1** é um snapshot JSON leve (poucos números). O **caminho 4** não
-consegue: entrega relatórios de tema único, sem cruzar dimensões.
+Os caminhos **2, 5 e 6** pegam essa tabela pronta da Data API, numa única
+chamada `runReport`. O **caminho 3** constrói o mesmo por SQL a partir do evento
+cru, sem teto de dimensão. O **caminho 1** é um snapshot JSON leve (poucos
+números). O **caminho 4** não entrega essa tabela: cada relatório é de um tema
+só, e cruzar dois pela data atribui a métrica de um recorte a outro que nunca
+foi a mesma sessão. Enviesa.
 
 ## Visão geral
 
@@ -82,7 +84,7 @@ só configuração de console.
 | Frequência | streaming + tabela diária | a cada 24h, com janela de reprocessamento |
 | Autenticação | conta Google com acesso à propriedade (1 clique) | conta Google (OAuth, 1 vez) |
 | Custo | armazenamento no BigQuery (+ inserção, só no streaming) | armazenamento no BigQuery |
-| `fato_sessoes`? | sim, por SQL de sessionização (sem teto de dims) | não — relatórios de tema único, sem cruzamento |
+| `fato_sessoes`? | sim, por SQL de sessionização (sem teto de dims) | não: relatórios de tema único, cruzar dois enviesa |
 | Pasta | `caminho-3-google-bigquery-export-nativo/` | `caminho-4-google-bigquery-data-transfer-service/` |
 
 ---
@@ -225,8 +227,11 @@ relatório vem em **dupla**:
 - `ga4_<Relatorio>_<ID>`: **view** deduplicada por cima. É a que você consulta.
 
 Cada relatório é um agregado de **um tema só** (aquisição, ou device, ou landing,
-ou geo…). Não dá pra montar o `fato_sessoes`: os temas vivem em tabelas
-separadas, sem chave em comum além da data. Consulta de exemplo em
+ou geo). Não dá pra montar o `fato_sessoes` aqui, e não é só falta de chave:
+juntar dois relatórios pela data pega a métrica de um recorte e repete pra cada
+valor do outro, como se `Organic` + `iOS` fosse uma sessão que o GA4 mediu. É
+contar o número de um usuário no balde de outro. Cada consulta lê **um**
+relatório. Exemplo em
 [`caminho-4-google-bigquery-data-transfer-service/exemplo.sql`](caminho-4-google-bigquery-data-transfer-service/exemplo.sql).
 
 ### Custo
@@ -237,8 +242,9 @@ Só o armazenamento das tabelas.
 ### Serve para
 
 Ter rápido, sem escrever SQL de modelagem, os números que o GA4 já mostra na
-tela, num lugar onde dá para juntar com outras fontes. Não te dá o evento cru
-nem cruzamento livre de dimensões.
+tela, num lugar onde dá para ligar com outras fontes por uma chave real (data,
+campanha) num modelo de BI. Não te dá o evento cru, e os relatórios não se
+cruzam entre si sem enviesar.
 
 Detalhes: [`caminho-4-google-bigquery-data-transfer-service/`](caminho-4-google-bigquery-data-transfer-service/)
 
