@@ -19,7 +19,7 @@ Este caminho não tem código: é configuração de console mais um `.sql`.
 | Arquivo | O que é |
 |---|---|
 | `exemplo.sql` | como o evento cru se parece: `UNNEST` em `event_params`, eventos por dia/nome |
-| `eventos.sql` | `CREATE OR REPLACE VIEW dados_tratados.eventos` — o `events_*` vetorizado: uma linha por evento, uma coluna por valor. `device` / `geo` / `session_traffic_source_last_click` / `traffic_source` / `privacy_info` abrem em `<caminho>_<campo>`; cada chave de `event_params` em `param_<chave>`; cada `event_name` num indicador `evento_<nome>`. Primeira coluna `registro_origem` = `analytics_<id>.events_<AAAAMMDD>`. |
+| `eventos.sql` | `CREATE OR REPLACE VIEW dados_tratados.eventos` — o `events_*` vetorizado: uma linha por evento, uma coluna por valor, nenhum STRUCT ou array numa célula. **Todo** bloco aninhado do schema do export (`device`, `geo`, `privacy_info`, `user_ltv`, `app_info`, `collected_traffic_source`, `traffic_source`, as 6 sub-structs de `session_traffic_source_last_click`, `ecommerce`, `publisher`) abre em `<caminho>_<campo>` e fica `NULL` onde a propriedade não usa; cada chave de `event_params` em `param_<chave>`; cada `event_name` num indicador `evento_<nome>`. Aqui isso dá ~179 colunas. Primeira coluna `registro_origem` = `analytics_<id>.events_<AAAAMMDD>`. |
 
 ## Como montar
 
@@ -53,15 +53,23 @@ Um registro por evento, no schema padrão do GA4 (em inglês):
 
 Achata tudo isso numa view sem mudar o grão:
 
-1. **STRUCTs viram colunas** — `device.web_info.browser` →
-   `device_web_info_browser`, `geo.city` → `geo_city`, e assim por diante.
-2. **`event_params` vira `param_<chave>`** — uma coluna por chave padrão do GA4
-   (`param_ga_session_id`, `param_page_location`, `param_engagement_time_msec`…).
-3. **`event_name` vira indicador** — `evento_page_view`, `evento_scroll`,
+1. **Todo STRUCT vira coluna**: `device.web_info.browser` →
+   `device_web_info_browser`, `geo.city` → `geo_city`,
+   `session_traffic_source_last_click.google_ads_campaign.campaign_id` →
+   `session_traffic_source_last_click_google_ads_campaign_campaign_id`. Os blocos
+   que a propriedade não usa (e-commerce, Google Ads, SA360/CM360/DV360, app)
+   viram colunas `NULL`, não somem.
+2. **`event_params` vira `param_<chave>`**: uma coluna por chave distinta da
+   propriedade (`SELECT DISTINCT key FROM …, UNNEST(event_params)`), tipada pelo
+   slot de `value` que ela usa.
+3. **`event_name` vira indicador**: `evento_page_view`, `evento_scroll`,
    `evento_session_start`… com `1` na linha daquele evento e `0` nas outras.
    Somar esses indicadores dá a contagem de cada evento em qualquer recorte, sem
    pivô e sem join.
-4. **`registro_origem`** — a tabela diária de onde a linha veio.
+4. **`registro_origem`**: a tabela diária de onde a linha veio.
+
+`user_properties` seria `user_prop_<chave>` pelo mesmo critério; nesta
+propriedade não há nenhuma, então não gera coluna.
 
 `items` (linha de produto do e-commerce) muda o grão, então fica de fora da
 view principal — abra num `CROSS JOIN UNNEST(items)` à parte quando precisar.
