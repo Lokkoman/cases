@@ -1,11 +1,11 @@
-# Caminho 5 — Microsoft Fabric + Airflow + GA4 Data API
+# Caminho 6 — Microsoft Fabric + Airflow + GA4 Data API
 
 O [caminho 1](../caminho-1-github-actions-data-api/) (GA4 Data API) rodando
-dentro de um Notebook do Microsoft Fabric que grava tabelas Delta num Lakehouse.
-O Airflow roda local (Docker), não toca no dado: só dispara o Notebook pela API
-do Fabric e espera terminar.
+dentro de um Notebook do Microsoft Fabric que grava uma tabela Delta num
+Lakehouse. O Airflow roda local (Docker), não toca no dado: só dispara o Notebook
+pela API do Fabric e espera terminar.
 
-O ponto do case é a orquestração. A extração em si (GA4 Data API dentro de um
+O ponto do case é a **orquestração**. A extração em si (GA4 Data API dentro de um
 notebook) já é padrão conhecido. O que raramente aparece pronto é Airflow fora
 do Fabric acionando um item do Fabric por service principal.
 
@@ -20,66 +20,55 @@ do Fabric acionando um item do Fabric por service principal.
 | Bibliotecas | Environment do Fabric (`env-ga4`) | `google-analytics-data` pré-instalado |
 | Extração | GA4 Data API (`google-analytics-data`) | `runReport`, autenticado por service account |
 | Segredo | Azure Key Vault (`kv-raulpavao-fabric`) | chave da service account, lida por `notebookutils.credentials.getSecret` |
-| Formato / catálogo | Delta Lake no Lakehouse (`lh_ga4_portfolio`, OneLake) | 9 tabelas bronze + SQL analytics endpoint |
+| Formato / catálogo | Delta Lake no Lakehouse (`lh_ga4_portfolio`, OneLake) | tabela `fato_sessoes` + SQL analytics endpoint |
 
 Conceitos (REST, cluster driver/executor, capacidade/SKU, sessão Livy,
-Environment, deferrable, medallion, chave de atribuição) em
+Environment, deferrable, tabela de mídia, chave de atribuição) em
 [`../CONCEITOS.md`](../CONCEITOS.md).
 
 ## Arquitetura
 
 ```mermaid
 flowchart LR
-  airflow["Airflow (Docker local)"] -->|"REST API do Fabric<br/>(service principal)"| nb["Notebook nb_ga4_bronze_ingest"]
-  ga4["GA4 (propriedade)"] -->|"Data API, runReport"| nb
-  nb -->|"Delta"| lh["Lakehouse lh_ga4_portfolio"]
+  airflow["Airflow (Docker local)"] -->|"REST API do Fabric<br/>(service principal)"| nb["Notebook nb_ga4_fato_sessoes"]
+  ga4["GA4 (propriedade)"] -->|"Data API, 1x runReport"| nb
+  nb -->|"Delta"| lh["Lakehouse lh_ga4_portfolio: fato_sessoes"]
 ```
 
 | Peça | Onde roda | Papel |
 |---|---|---|
 | Airflow | Docker na sua máquina | agenda e dispara, lê status |
-| Notebook `nb_ga4_bronze_ingest` | cluster Spark efêmero do Fabric | chama a GA4 Data API e grava Delta |
+| Notebook `nb_ga4_fato_sessoes` | cluster Spark efêmero do Fabric | chama a GA4 Data API e grava Delta |
 | Environment `env-ga4` | Fabric | traz `google-analytics-data` pré-instalado no cluster |
 | Key Vault `kv-raulpavao-fabric` | Azure | guarda a chave da service account do GA4 |
-| Lakehouse `lh_ga4_portfolio` | OneLake | 9 tabelas bronze |
+| Lakehouse `lh_ga4_portfolio` | OneLake | a tabela `fato_sessoes` |
 
 Ao disparar, o Fabric sobe um cluster (1 driver + executores) na capacidade,
-roda o notebook e derruba o cluster no fim. O driver faz as chamadas à API do
+roda o notebook e derruba o cluster no fim. O driver faz a chamada à API do
 GA4; os executores distribuem a gravação Delta. A capacidade de avaliação é
 pequena, cabe ~um cluster por vez.
 
 ## O que o Notebook faz
 
-9 chamadas `runReport`, cada uma com a chave de atribuição fixa
-(`date, sessionDefaultChannelGroup, sessionSource, sessionMedium, sessionCampaignName`)
-mais dimensões extras, gravando uma tabela Delta. A API limita 9 dims / 10
-métricas por chamada, por isso a divisão. O conjunto cobre o que a área de
-mídia precisa: atribuição (sessão e primeiro usuário), utm_content/term,
-dispositivo/tech, geo, página de entrada, eventos e e-commerce.
+**Uma** chamada `runReport`: 9 dimensões de mídia, 10 métricas — o teto de uma
+chamada da Data API. Grava a tabela Delta `fato_sessoes` no Lakehouse. É o
+**mesmo schema** do caminho 2 (Sheets) e do caminho 5 (Databricks).
 
-| Tabela | Dimensões extras | Métricas |
-|---|---|---|
-| `bronze_sessions_daily` | `sessionCampaignId`, `sessionPrimaryChannelGroup`, `sessionManualAdContent`, `sessionManualTerm` | sessions, totalUsers, newUsers, engagedSessions, screenPageViews, keyEvents, userEngagementDuration |
-| `bronze_first_touch_daily` | `firstUserDefaultChannelGroup`, `firstUserSource`, `firstUserMedium`, `firstUserCampaignName` | sessions, totalUsers, newUsers, engagedSessions |
-| `bronze_key_events_daily` | `eventName` | keyEvents, eventCount |
-| `bronze_device_daily` | `deviceCategory`, `operatingSystem`, `browser` | sessions, totalUsers, activeUsers, newUsers, engagedSessions, screenPageViews, userEngagementDuration |
-| `bronze_geo_daily` | `country`, `region`, `city` | sessions, totalUsers, activeUsers, newUsers, engagedSessions, screenPageViews, userEngagementDuration |
-| `bronze_landing_page_daily` | `landingPagePlusQueryString` | sessions, totalUsers, engagedSessions, screenPageViews, keyEvents, userEngagementDuration |
-| `bronze_events_daily` | `eventName` | eventCount, activeUsers |
-| `bronze_ecommerce_daily` | — | transactions, purchaseRevenue, ecommercePurchases, totalRevenue, itemsPurchased |
-| `bronze_pages_daily` | `pagePathPlusQueryString` | screenPageViews, sessions, activeUsers, userEngagementDuration |
+| Dimensões (9) | Métricas (10) |
+|---|---|
+| `date` | `sessions` |
+| `sessionDefaultChannelGroup` | `totalUsers` |
+| `sessionSource` | `newUsers` |
+| `sessionMedium` | `engagedSessions` |
+| `sessionManualAdContent` (utm_content) | `engagementRate` |
+| `sessionCampaignId` (utm_id) | `screenPageViews` |
+| `operatingSystem` | `eventsPerSession` |
+| `city` | `keyEvents` |
+| `landingPagePlusQueryString` | `sessionKeyEventRate` |
+| | `averageSessionDuration` |
 
-Tabela sem tráfego no período (ex.: e-commerce num site sem loja) grava vazia
-com o schema certo, não quebra.
-
-O conjunto cobre as 16 dimensões e quase todas as métricas da tratada do
-BigQuery (`dados_tratados`). Ficam de fora, por limite da Data API:
-`paginas_distintas` (`COUNT DISTINCT` só sai do evento cru) e `sessoes_novas`
-(não é métrica padrão da API).
-
-A camada **prata** (agregar cada bronze pra chave de 5, cruzar e pivotar
-eventos em coluna, igual ao `dados_tratados` do BigQuery) ainda não está aqui.
-No [caminho 4](../caminho-4-microsoft-azure-databricks-data-api/) ela existe.
+Cobrir mais que 9 dimensões numa tabela só não sai da Data API — aí seria
+BigQuery com evento cru ([caminho 3](../caminho-3-google-bigquery-export-nativo/)).
 
 A chave da service account vem do Key Vault por
 `notebookutils.credentials.getSecret`, nunca fica no código.
@@ -155,8 +144,8 @@ docker compose up -d --build
 ```
 
 Airflow em http://localhost:8080 (admin / admin). Despausar o DAG
-`ga4_bronze_fabric` e disparar. O DAG roda uma task só, `run_bronze_ingest`, em
-modo deferrable: agenda o Notebook, libera o worker e volta a checar o status.
+`ga4_fato_sessoes_fabric` e disparar. O DAG roda uma task só, `run_fato_sessoes`,
+em modo deferrable: agenda o Notebook, libera o worker e volta a checar o status.
 
 Parar tudo:
 
@@ -171,8 +160,8 @@ docker compose down
 | `docker-compose.yml` | Airflow LocalExecutor + Postgres, 2 serviços + init |
 | `Dockerfile` | imagem oficial do Airflow 2.10.5 + provider do Fabric |
 | `requirements.txt` | `apache-airflow-providers-microsoft-fabric` |
-| `dags/ga4_bronze_fabric.py` | o DAG, um `MSFabricRunJobOperator` |
-| `notebook_nb_ga4_bronze_ingest.py` | cópia versionada do código que roda no Fabric (as 9 chamadas) |
+| `dags/ga4_fato_sessoes_fabric.py` | o DAG, um `MSFabricRunJobOperator` |
+| `notebook_nb_ga4_fato_sessoes.py` | cópia versionada do código que roda no Fabric (a chamada única) |
 | `.env.example` | conexão do Fabric (como URI) e os IDs do workspace/notebook |
 
 ## Notas

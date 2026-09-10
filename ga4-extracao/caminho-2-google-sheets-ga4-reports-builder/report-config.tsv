@@ -1,0 +1,14 @@
+Campo	Valor
+Report Name	fato_sessoes
+Type	GA4
+Property ID	properties/552236564
+Start Date	28daysAgo
+End Date	yesterday
+Metrics	sessions,totalUsers,newUsers,engagedSessions,engagementRate,screenPageViews,eventsPerSession,keyEvents,sessionKeyEventRate,averageSessionDuration
+Dimensions	date,sessionDefaultChannelGroup,sessionSource,sessionMedium,sessionManualAdContent,sessionCampaignId,operatingSystem,city,landingPagePlusQueryString
+Metric Filter	{}
+Dimension Filter	{}
+Order	[]
+Limit	100000
+Spreadsheet URL
+Skip Report
